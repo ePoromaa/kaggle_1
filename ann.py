@@ -3,7 +3,7 @@ import tensorflow as tf
 import tensorflow.contrib.slim as slim
 import numpy as np 
 from csv import DictReader
-from matplotlib import pyplot as plt
+# from matplotlib import pyplot as plt
 import random
 from scipy import misc
 from time import time
@@ -93,7 +93,7 @@ def cnn(x):
 	# The graph
 	# Initial downsampling # 77 conv + maxpool
 	hidden = slim.conv2d(x, 32, [7, 7], stride=2, padding="SAME", activation_fn=tf.nn.relu)
-	hidden = slim.max_pool2d(hidden,[2,2],stride=2)
+	hidden = slim.max_pool2d(hidden, [2, 2], stride=2)
 
 	# 3x3 layers
 	hidden = slim.conv2d(hidden,32,[3,3],stride=1,padding="SAME",activation_fn=tf.nn.relu,normalizer_fn=bn)
@@ -132,6 +132,8 @@ def main():
 	y_placeholder = tf.placeholder(tf.float32, [None, 17])
 	num_params = 0
 	l2_loss = 0.0
+	output_sigmoids, output_layer = cnn(x_placeholder) # Create cnn
+
 	for variable in tf.trainable_variables():
 		print(variable)
 		l2_loss += tf.reduce_sum(tf.square(variable))
@@ -142,10 +144,9 @@ def main():
 		num_params += n
 	print("Number of parameters", num_params)
 
-	output_sigmoids, output_layer = cnn(x_placeholder)  # Create cnn
 	loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=y_placeholder, logits=output_layer))
-	learning_rate = tf.Variable(0.1, trainable=False)
-	optimizer = tf.train.AdagradOptimizer(learning_rate)
+	learning_rate = tf.Variable(0.001, trainable=False)
+	optimizer = tf.train.AdamOptimizer(learning_rate)
 
 	train_op = optimizer.minimize(loss + 0.00005 * l2_loss)
 
@@ -160,14 +161,15 @@ def main():
 
 	print('The number of training rows', len(train_rows))
 	UNIQUE_LABELS = read_data()
-
+	best_epoch = 0
+	best_loss = 0.0
 	for epoch in range(100):
 
 		train_loss = 0.0
 		train_count = 0.0
 		random.shuffle(train_rows)
 		if epoch > 0 and epoch % 50 == 0:
-			sess.run(tf.assign(learning_rate, learning_rate * 0.1))
+			pass  # sess.run(tf.assign(learning_rate, learning_rate * 0.1))
 		t1 = time()
 		for i, (image_batch, label_batch) in enumerate(extract_data(train_rows, 256, UNIQUE_LABELS)):
 			_, L = sess.run([train_op, loss], feed_dict={x_placeholder: image_batch, y_placeholder: label_batch})
@@ -194,14 +196,19 @@ def main():
 		for i in range(17):
 			p[:, i] = (predictions[:, i] > thresholds[i]).astype(np.int)
 		fbeta = fbeta_score(targets, p, beta=2, average='samples')
-
-		print("Epoch ", epoch,
-			  " Train=", train_loss / train_count,
-			  " Test=", sum(validation_losses) / len(validation_losses),
-			  " F2=", fbeta, " at ", ",".join(map(str, thresholds)),
-			  " Time=", elapsed_time,
-			  " LR=", sess.run(learning_rate),
-			  " L2=", sess.run(l2_loss))
+		if fbeta > best_loss:
+			best_loss = fbeta
+			best_epoch = epoch
+		with open("results.txt", "a") as outputfile:
+			# TODO: Add recall and precision
+			outputfile.write("Epoch "+ str(epoch)+
+				  " Train="+str(train_loss / train_count)+
+			  	" Test="+ str(sum(validation_losses) / len(validation_losses))+
+			  	" F2="+ str(fbeta)+ " at "+ ",".join(map(str, thresholds))+
+			  	" Time="+ str(elapsed_time)+
+			  	" L2="+ str(sess.run(l2_loss))+"\n")
+		if best_epoch + 5 < epoch:
+			break
 
 	#  print()
 	return None
@@ -209,5 +216,7 @@ def main():
 
 if __name__ == '__main__':
 	print("Executed {0}.".format(__file__))
+	main()
+	print("END")
 
 
