@@ -7,14 +7,15 @@ from csv import DictReader
 import random
 from scipy import misc
 from time import time
-from sklearn.metrics import fbeta_score
+from sklearn.metrics import fbeta_score, recall_score, precision_score
 
 
 def f2_score(y_true, y_pred):
     # fbeta_score throws a confusing error if inputs are not numpy arrays
     y_true, y_pred, = np.array(y_true), np.array(y_pred)
     # We need to use average='samples' here, any other average method will generate bogus results
-    return fbeta_score(y_true, y_pred, beta=2, average='samples')
+	return fbeta_score(y_true, y_pred, beta=2, average='samples'), recall_score(y_true, y_pred), precision_score(y_true,
+																												 y_pred)
 
 
 def optimise_f2_thresholds(y, p, verbose=False, resolution=100):
@@ -195,22 +196,22 @@ def main():
 		p = np.zeros_like(predictions)
 		for i in range(17):
 			p[:, i] = (predictions[:, i] > thresholds[i]).astype(np.int)
-		fbeta = fbeta_score(targets, p, beta=2, average='samples')
+		fbeta, recall, precision = fbeta_score(targets, p, beta=2, average='samples')
 		if fbeta > best_loss:
 			best_loss = fbeta
 			best_epoch = epoch
 		with open("results.txt", "a") as outputfile:
-			# TODO: Add recall and precision
 			outputfile.write("Epoch "+ str(epoch)+
 				  " Train="+str(train_loss / train_count)+
 			  	" Test="+ str(sum(validation_losses) / len(validation_losses))+
 			  	" F2="+ str(fbeta)+ " at "+ ",".join(map(str, thresholds))+
+				" recall="+str(recall)+
+				" precision"+str(precision)+
 			  	" Time="+ str(elapsed_time)+
 			  	" L2="+ str(sess.run(l2_loss))+"\n")
 		if best_epoch + 5 < epoch:
 			break
 
-	#  print()
 	return None
 
 
