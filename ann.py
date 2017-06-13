@@ -10,12 +10,13 @@ from time import time
 from sklearn.metrics import fbeta_score, recall_score, precision_score
 
 
-def f2_score(y_true, y_pred):
+def f2_score(y_true, y_pred, beta=2, average='samples'):
 	# fbeta_score throws a confusing error if inputs are not numpy arrays
 	y_true, y_pred, = np.array(y_true), np.array(y_pred)
 	# We need to use average='samples' here, any other average method will generate bogus results
-	return fbeta_score(y_true, y_pred, beta=2, average='samples'), recall_score(y_true, y_pred), precision_score(y_true,
-																												 y_pred)
+	return fbeta_score(y_true, y_pred, beta=beta, average=average),\
+		recall_score(y_true, y_pred, average=None),\
+		precision_score(y_true, y_pred, average=None)  # gives recall & precision for each class
 
 
 def optimise_f2_thresholds(y, p, verbose=False, resolution=100):
@@ -91,38 +92,38 @@ def bn(x):
 
 
 def cnn(x):
-	# The graph
+	""" The graph """
 	# Initial downsampling # 77 conv + maxpool
 	hidden = slim.conv2d(x, 32, [7, 7], stride=2, padding="SAME", activation_fn=tf.nn.relu)
 	hidden = slim.max_pool2d(hidden, [2, 2], stride=2)
 
 	# 3x3 layers
-	hidden = slim.conv2d(hidden,32,[3,3],stride=1,padding="SAME",activation_fn=tf.nn.relu,normalizer_fn=bn)
+	hidden = slim.conv2d(hidden, 32, [3, 3], stride=1, padding="SAME", activation_fn=tf.nn.relu, normalizer_fn=bn)
 
 	# Block 1, begin by stride 2
-	hidden = slim.conv2d(hidden,64,[3,3],stride=2,padding="SAME",activation_fn=tf.nn.relu,normalizer_fn=bn)
-	hidden = slim.conv2d(hidden,64,[1,1],stride=1,padding="SAME",activation_fn=tf.nn.relu,normalizer_fn=bn)
-	hidden = slim.conv2d(hidden,64,[1,1],stride=1,padding="SAME",activation_fn=tf.nn.relu,normalizer_fn=bn)
-	hidden = slim.conv2d(hidden,64,[1,1],stride=1,padding="SAME",activation_fn=tf.nn.relu,normalizer_fn=bn)
+	hidden = slim.conv2d(hidden, 64, [3, 3], stride=2, padding="SAME", activation_fn=tf.nn.relu, normalizer_fn=bn)
+	hidden = slim.conv2d(hidden, 64, [1, 1], stride=1, padding="SAME", activation_fn=tf.nn.relu, normalizer_fn=bn)
+	hidden = slim.conv2d(hidden, 64, [1, 1], stride=1, padding="SAME", activation_fn=tf.nn.relu, normalizer_fn=bn)
+	hidden = slim.conv2d(hidden, 64, [1, 1], stride=1, padding="SAME", activation_fn=tf.nn.relu, normalizer_fn=bn)
 
 	# Block 2, begin by stride 3
-	hidden = slim.conv2d(hidden,128,[3,3],stride=2,padding="SAME",activation_fn=tf.nn.relu,normalizer_fn=bn)
-	hidden = slim.conv2d(hidden,128,[1,1],stride=1,padding="SAME",activation_fn=tf.nn.relu,normalizer_fn=bn)
-	hidden = slim.conv2d(hidden,128,[1,1],stride=1,padding="SAME",activation_fn=tf.nn.relu,normalizer_fn=bn)
-	hidden = slim.conv2d(hidden,128,[1,1],stride=1,padding="SAME",activation_fn=tf.nn.relu,normalizer_fn=bn)
+	hidden = slim.conv2d(hidden, 128, [3, 3], stride=2, padding="SAME", activation_fn=tf.nn.relu, normalizer_fn=bn)
+	hidden = slim.conv2d(hidden, 128, [1, 1], stride=1, padding="SAME", activation_fn=tf.nn.relu, normalizer_fn=bn)
+	hidden = slim.conv2d(hidden, 128, [1, 1], stride=1, padding="SAME", activation_fn=tf.nn.relu, normalizer_fn=bn)
+	hidden = slim.conv2d(hidden, 128, [1, 1], stride=1, padding="SAME", activation_fn=tf.nn.relu, normalizer_fn=bn)
 
 	# Block 3, begin by stride 3
-	hidden = slim.conv2d(hidden,256,[3,3],stride=2,padding="SAME",activation_fn=tf.nn.relu,normalizer_fn=bn)
-	hidden = slim.conv2d(hidden,256,[1,1],stride=1,padding="SAME",activation_fn=tf.nn.relu,normalizer_fn=bn)
-	hidden = slim.conv2d(hidden,256,[1,1],stride=1,padding="SAME",activation_fn=tf.nn.relu,normalizer_fn=bn)
-	hidden = slim.conv2d(hidden,256,[1,1],stride=1,padding="SAME",activation_fn=tf.nn.relu,normalizer_fn=bn)
+	hidden = slim.conv2d(hidden, 256, [3, 3], stride=2, padding="SAME", activation_fn=tf.nn.relu, normalizer_fn=bn)
+	hidden = slim.conv2d(hidden, 256, [1, 1], stride=1, padding="SAME", activation_fn=tf.nn.relu, normalizer_fn=bn)
+	hidden = slim.conv2d(hidden, 256, [1, 1], stride=1, padding="SAME", activation_fn=tf.nn.relu, normalizer_fn=bn)
+	hidden = slim.conv2d(hidden, 256, [1, 1], stride=1, padding="SAME", activation_fn=tf.nn.relu, normalizer_fn=bn)
 
 	# Global avg pool
-	hidden = slim.avg_pool2d(hidden,kernel_size=[8,8],stride=1,padding="VALID")
+	hidden = slim.avg_pool2d(hidden, kernel_size=[8, 8], stride=1, padding="VALID")
 
 	# FC layers
 	hidden = slim.flatten(hidden)
-	output_layer = slim.fully_connected(hidden,17,activation_fn=None)
+	output_layer = slim.fully_connected(hidden, 17, activation_fn=None)
 
 	output_sigmoids = tf.sigmoid(output_layer)
 	return output_sigmoids, output_layer
@@ -196,7 +197,7 @@ def main():
 		p = np.zeros_like(predictions)
 		for i in range(17):
 			p[:, i] = (predictions[:, i] > thresholds[i]).astype(np.int)
-		fbeta, recall, precision = fbeta_score(targets, p, beta=2, average='samples')
+		fbeta, recall, precision = f2_score(targets, p, beta=2, average='samples')
 		if fbeta > best_loss:
 			best_loss = fbeta
 			best_epoch = epoch
